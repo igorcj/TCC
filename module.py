@@ -1,56 +1,71 @@
+import networkx as nx
 import argparse
-import os.path
+import pickle
 import spacy
+import os
 
 
-def extract(inpath, outpath):
+def configure():
+    os.system('pip3 install -r requirements.txt')
+    os.system('python3 -m spacy download pt_core_news_lg')
+
+
+def process_file(inpath, file):
+    print('processing', file)
+    with open(inpath + file) as f:
+        text = f.read().split('---')[-1].replace('\n', ' ')
+    nlp = spacy.load("pt_core_news_lg")
+    nlp.add_pipe('sentencizer')
+    return nlp(text)
+
+
+def get_parents(G, doc):
+    for sentence in doc.sents:
+        root = sentence.root
+        if root.text != 'nasceu': continue
+        children = list(root.children)
+        node = list(filter(lambda x:x.dep_=='nsubj', children))[0]
+        name = ' '.join([t.text for t in node.subtree if t.pos_=='PROPN'])
+        G.add_node(name)
+        subtree = list(filter(lambda x:x.text.startswith('filh'), children))
+        if not len(subtree): continue
+        parents = [' '.join([x.text for x in t.subtree if x.pos_=='PROPN']) for t in subtree[0].children if t.pos_=='PROPN']
+        for p in parents:
+            G.add_edge(p, name)
+    return G
+
+
+def process(inpath, outpath):
     if not inpath: inpath = '../dhbb-1.0.0/text/'
-    if not outpath: outpath = 'raw/'
+    if not outpath: outpath = ''
     if os.path.isfile(inpath): inlist = [inpath]
-    elif os.path.isdir(inpath): inlist = [1,2,3]
+    elif os.path.isdir(inpath): inlist = [f for f in os.listdir(inpath) if f.endswith(".text")]
     else: raise Exception('Input file or directory is invalid')
+    G = nx.DiGraph()
+    for f in inlist:
+        doc = process_file(inpath, f)
+        G = get_parents(G, doc)
+    with open('people_graph.pickle', 'wb') as f:
+        pickle.dump(G, f)
 
-
-    print(inlist)
-
-
-def transform():
-    print('transform')
 
 if __name__ == '__main__':
 
+    process('test/', '')
+
     parser = argparse.ArgumentParser(description='Main project module')
-    parser.add_argument("-e", "--extract", action="store_true",
+    parser.add_argument("-c", "--configure", action="store_true",
+        help="configure environment")
+    parser.add_argument("-p", "--process", action="store_true",
         help="load sentences from dhbb")
-    parser.add_argument("-t", "--transform", action="store_true",
-        help="transform sentences from dhbb")
     parser.add_argument('inpath', nargs='?', const=None,
         help='input file or directory path. none for all files')
     parser.add_argument('outpath', nargs='?', const=None,
         help='output file or directory path. none for all files')
     args = parser.parse_args()
 
-    if args.extract: extract(args.inpath, args.outpath)
-    elif args.transform: transform()
+    if args.configure: configure()
+    elif args.process: process(args.inpath, args.outpath)
     else: parser.print_help()
 
-
-
-
-# >>> with open('../dhbb-1.0.0/text/5458.text') as f:
-# ...     d = f.read()
-# ... 
-# >>> p = d.split('\n\n')[1]
-# >>> s = p.replace('\n',' ').split('.')[0]
-# >>> s
-# '«Getúlio Dornelles Vargas» nasceu em São Borja (RS) no dia 19 de abril de 1882, filho de Manuel do Nascimento Vargas e de Cândida Dornelles Vargas'
-# >>> doc = nlp(s)
-# Traceback (most recent call last):
-#   File "<stdin>", line 1, in <module>
-# NameError: name 'nlp' is not defined
-# >>> import spacy
-# >>> nlp = spacy.load("pt_core_news_lg")
-# >>> doc = nlp(s)
-# >>> for token in doc:
-# ...     if token.pos_=='PROPN': print(token.text, token.pos_, token.dep_)
-# ...
+# ls |sort -R |tail -100 |while read file; do cp $file ../../TCC/test/$file; done
