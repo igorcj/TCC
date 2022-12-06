@@ -103,4 +103,5 @@ if __name__ == '__main__':
 # cc = sorted([(len(x), x) for x in nx.connected_components(G.to_undirected())], reverse=True)
 # comp = pd.DataFrame(cc, columns=['lenght', 'elements'])
 
-# sobrenomes = Counter([x for node in P.nodes for x in node.split(' ')])
+# sobrenomes = Counter([x for node in P.nodes for x in node.split(' ')[1:]])
+# sn = pd.DataFrame(sobrenomes.items(), columns=['sobrenome', 'contagem']).sort_values('contagem', ascending=False)
